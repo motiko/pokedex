@@ -6,50 +6,91 @@ import PokemonGamesSection from "../../components/PokemonGamesSection";
 import Column from "../../components/Column";
 import { fetchPokemonGames, fetchPokemonByName } from "../../api/pokeapi";
 
+let games = null;
+let error = null;
+
+const fetchGames = pokemon =>
+  fetchPokemonGames(pokemon.game_indices.map(game => game.version.name))
+    .then(result => {
+      games = result;
+    })
+    .catch(err => {
+      error = err;
+    });
+
 function PokemonGames({ pokemon }) {
-  const [games, setGames] = useState(null);
-
-  useEffect(() => {
-    setGames(null);
-
-    if (!pokemon) return;
-    fetchPokemonGames(pokemon.game_indices.map(game => game.version.name)).then(
-      games => {
-        setGames(games);
-      }
-    );
-  }, [pokemon]);
-
-  return !games ? <Spinner /> : <PokemonGamesSection games={games} />;
+  if (!games) {
+    throw fetchGames(pokemon);
+  }
+  if (error) {
+    throw error;
+  }
+  return <PokemonGamesSection games={games} />;
 }
 
-function Pokemon({ name }) {
+const createResource = promise => {
+  // 💡 Use promise.then and a mutable "status" variable
+  // to keep track of promise status
+  // Store "data" and "error" in mutable variables and set
+  // them from promise.then and promise.catch
+  let data = null;
+  let error = null;
+  promise
+    .then(resul => {
+      data = resul;
+    })
+    .catch(err => {
+      error = err;
+    });
+  return {
+    read() {
+      // 💡 return data if there is data,
+      // otherwise throw error if there is error
+      // otherwise throw promise
+      if (data) {
+        return data;
+      }
+      if (error) {
+        throw error;
+      }
+      throw promise;
+    }
+  };
+};
+
+function Pokemon({ pokemonResource }) {
+  const pokemon = pokemonResource.read();
+  return (
+    <Column width={1} p={4}>
+          <PokemonProfile pokemon={pokemon} />
+          <PokemonGames pokemon={pokemon} />
+    </Column>
+  );
+}
+
+function usePokemon(name) {
   const [pokemon, setPokemon] = useState(null);
 
-  const fetchPokemon = () => {
+  useEffect(() => {
     setPokemon(null);
 
     if (!name) return;
     fetchPokemonByName(name).then(pokemon => {
       setPokemon(pokemon);
     });
-  };
+  }, [name]);
+  return pokemon;
+}
+
+function usePokemonGames(pokemon) {
+  const [games, setGames] = useState(null);
 
   useEffect(() => {
-    fetchPokemon();
-  }, [fetchPokemon, name]);
-  return (
-    <Column width={1} p={4}>
-      {!name ? null : !pokemon ? (
-        <Spinner />
-      ) : (
-        <>
-          <PokemonProfile pokemon={pokemon} />
-          <PokemonGames pokemon={pokemon} />
-        </>
-      )}
-    </Column>
-  );
+    setGames(null);
+
+    if (!pokemon) return;
+  }, [pokemon]);
+  return games;
 }
 
 export default Pokemon;
